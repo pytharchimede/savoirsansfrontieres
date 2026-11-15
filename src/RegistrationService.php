@@ -9,7 +9,15 @@ final class RegistrationService {
   $phone=trim((string)($input['phone']??''));
   $subject=$type==='etudiant'?trim((string)($input['subject']??'')):null;
   $studentLevel=$type==='etudiant'?trim((string)($input['student_level']??'')):null;
-  if($type==='etudiant' && (!in_array($subject,['mathematiques','physique'],true) || $studentLevel===null || mb_strlen($studentLevel)<2 || mb_strlen($studentLevel)>100))throw new InvalidArgumentException('Veuillez choisir la matière et préciser la classe ou le niveau.');
+  if($type==='etudiant'){
+   $db=ssf_db();
+   foreach([['education_subjects',$subject],['education_levels',$studentLevel]] as [$table,$value]){
+    if(!$value || mb_strlen($value)>100)throw new InvalidArgumentException('Veuillez sélectionner une matière et un niveau dans les listes.');
+    $stmt=$db->prepare("SELECT COUNT(*) FROM $table WHERE code=? AND active=1");
+    $stmt->execute([$value]);
+    if(!(int)$stmt->fetchColumn())throw new InvalidArgumentException('Veuillez sélectionner une matière et un niveau disponibles dans les listes.');
+   }
+  }
   if (!in_array($type,['etudiant','enseignant'],true) || mb_strlen($name)<3 || mb_strlen($name)>180 ||
       !filter_var($email,FILTER_VALIDATE_EMAIL) || strlen($email)>254 ||
       strlen($phone)<6 || strlen($phone)>50 || empty($input['consent'])) {
