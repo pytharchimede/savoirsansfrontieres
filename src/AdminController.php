@@ -5,7 +5,7 @@ final class AdminController {
  private static function go(string $path): never {header('Location: '.$path,true,303);exit;}
  private static function page(string $title,string $body): never {
   $user=AdminAuth::user();$name=self::esc($user['username']??'');
-  $nav=$user?'<nav><a href="/admin">Tableau de bord</a> <a href="/admin/inscriptions">Inscriptions</a> '.(AdminAuth::can('users.manage')?'<a href="/admin/utilisateurs">Utilisateurs</a> ':'').(AdminAuth::can('groups.manage')?'<a href="/admin/groupes">Groupes</a> ':'').'<form action="/admin/logout" method="post"><input type="hidden" name="csrf" value="'.AdminAuth::csrf().'"><button>Déconnexion ('.$name.')</button></form></nav>':'';
+  $nav=$user?'<nav><a href="/admin">Tableau de bord</a> <a href="/admin/inscriptions">Inscriptions</a> '.(AdminAuth::can('users.manage')?'<a href="/admin/utilisateurs">Utilisateurs</a> ':'').(AdminAuth::can('groups.manage')?'<a href="/admin/groupes">Groupes</a> ':'').(AdminAuth::can('subjects.manage')?'<a href="/admin/matieres">Matières</a> ':'').'<form action="/admin/logout" method="post"><input type="hidden" name="csrf" value="'.AdminAuth::csrf().'"><button>Déconnexion ('.$name.')</button></form></nav>':'';
   header('Content-Type: text/html; charset=utf-8');header('Cache-Control: no-store');
   echo '<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>'.self::esc($title).' — SSF Administration</title><link rel="stylesheet" href="/assets/admin.css"></head><body><header><a class="brand" href="/admin">✦ SAVOIR SANS FRONTIÈRES <small>Administration</small></a>'.$nav.'</header><main><h1>'.self::esc($title).'</h1>'.$body.'</main></body></html>';exit;
  }
@@ -45,7 +45,7 @@ final class AdminController {
     $stmt->execute($params);$rows=$stmt->fetchAll();
     if($export==='xlsx')AdminExport::xlsx($rows);AdminExport::pdf($rows);
    }
-   $stmt=$db->prepare('SELECT id,type,full_name,email,phone,created_at FROM registrations'.$filter.' ORDER BY created_at DESC,id DESC LIMIT 30 OFFSET '.$offset);
+   $stmt=$db->prepare('SELECT id,type,full_name,email,phone,subject,student_level,created_at FROM registrations'.$filter.' ORDER BY created_at DESC,id DESC LIMIT 30 OFFSET '.$offset);
    $stmt->execute($params);$rows=$stmt->fetchAll();
    $body='<form method="get" class="filters"><input name="q" placeholder="Nom, email, téléphone" value="'.self::esc($q).'"><select name="type"><option value="">Tous les profils</option><option value="etudiant"'.($type==='etudiant'?' selected':'').'>Apprenants</option><option value="enseignant"'.($type==='enseignant'?' selected':'').'>Enseignants</option></select><button>Filtrer</button></form><p>'.$total.' inscription(s)</p>';
    $query=http_build_query(['q'=>$q,'type'=>$type]);
@@ -57,6 +57,33 @@ final class AdminController {
    $body.='Page '.$page.' / '.max(1,(int)ceil($total/$perPage));
    if($offset+$perPage<$total)$body.=' <a href="?'.$query.'&page='.($page+1).'">Suivant →</a>';
    self::page('Inscriptions',$body.'</div>');
+  }
+  if($path==='/admin/matieres'){
+   AdminAuth::require('subjects.manage');$db=ssf_db();
+   if($method==='POST'){
+    AdminAuth::checkCsrf();$action=(string)($_POST['action']??'');
+    if($action==='create'){
+     $name=trim((string)($_POST['name']??''));
+     if(mb_strlen($name)<2||mb_strlen($name)>100){http_response_code(422);exit('Intitulé invalide (2 à 100 caractères).');}
+     $code='matiere_'.bin2hex(random_bytes(8));
+     $s=$db->prepare('INSERT INTO subjects(code,name,sort_order) VALUES(?,?,?)');
+     $s->execute([$code,$name,(int)($_POST['sort_order']??0)]);
+    }elseif($action==='update'){
+     $id=(int)($_POST['id']??0);$name=trim((string)($_POST['name']??''));
+     if($id<1||mb_strlen($name)<2||mb_strlen($name)>100){http_response_code(422);exit('Matière invalide.');}
+     $s=$db->prepare('UPDATE subjects SET name=?,sort_order=?,active=? WHERE id=?');
+     $s->execute([$name,(int)($_POST['sort_order']??0),isset($_POST['active'])?1:0,$id]);
+    }else{http_response_code(400);exit('Action invalide');}
+    self::go('/admin/matieres');
+   }
+   if($method!=='GET'){http_response_code(405);exit('Méthode non autorisée');}
+   $rows=$db->query('SELECT id,code,name,active,sort_order FROM subjects ORDER BY sort_order,name,id')->fetchAll();
+   $body='<p>Les matières actives apparaissent dans le formulaire des apprenants. Désactiver une matière ne modifie pas les inscriptions existantes.</p><div class="tablewrap"><table><thead><tr><th>Matière</th><th>Ordre</th><th>Visible</th><th>Action</th></tr></thead><tbody>';
+   foreach($rows as $s){
+    $body.='<tr><td colspan="4"><form method="post" class="panel">'.self::token().'<input type="hidden" name="action" value="update"><input type="hidden" name="id" value="'.(int)$s['id'].'"><label>Intitulé<input name="name" maxlength="100" required value="'.self::esc($s['name']).'"></label><label>Ordre<input type="number" name="sort_order" value="'.(int)$s['sort_order'].'"></label><label class="check"><input type="checkbox" name="active" value="1" '.($s['active']?'checked':'').'> Active</label><button>Enregistrer</button></form></td></tr>';
+   }
+   $body.='</tbody></table></div><h2>Ajouter une matière</h2><form method="post" class="panel">'.self::token().'<input type="hidden" name="action" value="create"><label>Nom de la matière<input name="name" maxlength="100" required placeholder="Ex. : Chimie"></label><label>Ordre d’affichage<input type="number" name="sort_order" value="30"></label><button>Ajouter</button></form>';
+   self::page('Gestion des matières',$body);
   }
   if($path==='/admin/utilisateurs'){
    AdminAuth::require('users.manage');$db=ssf_db();
