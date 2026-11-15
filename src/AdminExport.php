@@ -2,9 +2,9 @@
 declare(strict_types=1);
 final class AdminExport {
  public static function xlsx(array $rows): never {
-  $headers=['ID','Profil','Nom et prénom','Email','Téléphone','Date inscription'];
+  $headers=['ID','Profil','Nom et prénom','Email','Téléphone','Matière','Classe / niveau','Date inscription'];
   $xml='<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData>';
-  $all=array_merge([$headers],array_map(fn($r)=>[(string)$r['id'],$r['type'],$r['full_name'],$r['email'],$r['phone'],$r['created_at']],$rows));
+  $all=array_merge([$headers],array_map(fn($r)=>[(string)$r['id'],$r['type'],$r['full_name'],$r['email'],$r['phone'],$r['subject']??'',$r['student_level']??'',$r['created_at']],$rows));
   foreach($all as $i=>$line){$xml.='<row r="'.($i+1).'">';foreach($line as $j=>$v){$letter=chr(65+$j);$xml.='<c r="'.$letter.($i+1).'" t="inlineStr"><is><t>'.htmlspecialchars((string)$v,ENT_XML1|ENT_QUOTES,'UTF-8').'</t></is></c>';}$xml.='</row>';}
   $xml.='</sheetData></worksheet>';
   $files=[
@@ -33,7 +33,7 @@ final class AdminExport {
  public static function pdf(array $rows): never {
   // PDF simple sans dépendance externe ; caractères convertis pour les polices PDF standard.
   $lines=['SAVOIR SANS FRONTIERES - INSCRIPTIONS','Export du '.date('d/m/Y H:i'),''];
-  foreach($rows as $r){$lines[]='#'.$r['id'].' | '.$r['type'].' | '.$r['full_name'];$lines[]='  '.$r['email'].' | '.$r['phone'].' | '.$r['created_at'];$lines[]='';}
+  foreach($rows as $r){$lines[]='#'.$r['id'].' | '.$r['type'].' | '.$r['full_name'];$lines[]='  '.$r['email'].' | '.$r['phone'].' | '.($r['subject']??'').' | '.($r['student_level']??'').' | '.$r['created_at'];$lines[]='';}
   if(!$rows)$lines[]='Aucune inscription';
   $pages=array_chunk($lines,48);$objects=[];$objects[1]='<< /Type /Catalog /Pages 2 0 R >>';
   $objects[3]='<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>';

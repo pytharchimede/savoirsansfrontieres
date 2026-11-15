@@ -41,7 +41,7 @@ final class AdminController {
    $export=(string)($_GET['export']??'');
    if($export!==''){AdminAuth::require('registrations.export');if(!in_array($export,['pdf','xlsx'],true)){http_response_code(400);exit('Format invalide');}
     if($total>5000){http_response_code(413);exit('Export limité à 5000 lignes. Affinez vos filtres.');}
-    $stmt=$db->prepare('SELECT id,type,full_name,email,phone,created_at FROM registrations'.$filter.' ORDER BY created_at DESC,id DESC');
+    $stmt=$db->prepare('SELECT id,type,full_name,email,phone,subject,student_level,created_at FROM registrations'.$filter.' ORDER BY created_at DESC,id DESC');
     $stmt->execute($params);$rows=$stmt->fetchAll();
     if($export==='xlsx')AdminExport::xlsx($rows);AdminExport::pdf($rows);
    }
@@ -50,8 +50,8 @@ final class AdminController {
    $body='<form method="get" class="filters"><input name="q" placeholder="Nom, email, téléphone" value="'.self::esc($q).'"><select name="type"><option value="">Tous les profils</option><option value="etudiant"'.($type==='etudiant'?' selected':'').'>Apprenants</option><option value="enseignant"'.($type==='enseignant'?' selected':'').'>Enseignants</option></select><button>Filtrer</button></form><p>'.$total.' inscription(s)</p>';
    $query=http_build_query(['q'=>$q,'type'=>$type]);
    if(AdminAuth::can('registrations.export'))$body.='<p><a class="btn" href="/admin/inscriptions?'.$query.'&export=xlsx">Exporter Excel (.xlsx)</a> <a class="btn secondary" href="/admin/inscriptions?'.$query.'&export=pdf">Exporter PDF</a></p>';
-   $body.='<div class="tablewrap"><table><thead><tr><th>ID</th><th>Profil</th><th>Nom complet</th><th>Email</th><th>Téléphone</th><th>Inscrit le</th></tr></thead><tbody>';
-   foreach($rows as $r){$body.='<tr>';foreach(['id','type','full_name','email','phone','created_at'] as $k)$body.='<td>'.self::esc($r[$k]).'</td>';$body.='</tr>';}
+   $body.='<div class="tablewrap"><table><thead><tr><th>ID</th><th>Profil</th><th>Nom complet</th><th>Email</th><th>Téléphone</th><th>Matière</th><th>Classe / niveau</th><th>Inscrit le</th></tr></thead><tbody>';
+   foreach($rows as $r){$body.='<tr>';foreach(['id','type','full_name','email','phone','subject','student_level','created_at'] as $k)$body.='<td>'.self::esc($r[$k]).'</td>';$body.='</tr>';}
    $body.='</tbody></table></div><div class="pagination">';
    if($page>1)$body.='<a href="?'.$query.'&page='.($page-1).'">← Précédent</a> ';
    $body.='Page '.$page.' / '.max(1,(int)ceil($total/$perPage));
