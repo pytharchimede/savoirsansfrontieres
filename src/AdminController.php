@@ -191,11 +191,12 @@ final class AdminController {
    $assigned=$db->query('SELECT group_id,permission_id FROM admin_group_permissions')->fetchAll();$map=[];
    foreach($assigned as $a)$map[(int)$a['group_id']][(int)$a['permission_id']]=true;
    $body='<p>Les permissions du groupe Administrateurs sont protégées.</p>';
-   foreach($groups as $g){$locked=$g['name']==='Administrateurs';$body.='<form method="post" class="panel"><h2>'.self::esc($g['name']).'</h2>'.self::token().'<input type="hidden" name="action" value="permissions"><input type="hidden" name="group_id" value="'.(int)$g['id'].'">';
+   $body.='<div class="records">';
+   foreach($groups as $g){$locked=$g['name']==='Administrateurs';$body.='<form method="post" class="record-card"><h2>'.self::esc($g['name']).'</h2>'.self::token().'<input type="hidden" name="action" value="permissions"><input type="hidden" name="group_id" value="'.(int)$g['id'].'">';
     foreach($perms as $p)$body.='<label class="check"><input type="checkbox" name="permissions[]" value="'.(int)$p['id'].'" '.(!empty($map[(int)$g['id']][(int)$p['id']])?'checked ':'').($locked?'disabled':'').'> '.self::esc($p['label']).' <small>('.self::esc($p['code']).')</small></label>';
     if(!$locked)$body.='<button>Enregistrer les permissions</button>';$body.='</form>';
    }
-   self::page('Groupes et permissions',$body.'<h2>Créer un groupe</h2><form method="post" class="panel">'.self::token().'<input type="hidden" name="action" value="create"><label>Nom du groupe<input name="name" maxlength="100" required></label><button>Créer</button></form>');
+   self::page('Groupes et permissions',$body.'</div><h2>Créer un groupe</h2><form method="post" class="panel">'.self::token().'<input type="hidden" name="action" value="create"><label>Nom du groupe<input name="name" maxlength="100" required></label><button>Créer</button></form>');
   }
   http_response_code(404);exit('Page introuvable');
  }
