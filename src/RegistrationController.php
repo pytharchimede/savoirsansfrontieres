@@ -6,7 +6,6 @@ final class RegistrationController {
       !hash_equals($_SESSION['csrf'],$_POST['csrf'])) {
    http_response_code(419); exit('Session expirée. Actualisez la page.');
   }
-  if (!empty($_POST['website'])) { http_response_code(400); exit('Requête invalide'); }
   try {
    (new RegistrationService(new RegistrationRepository(ssf_db())))->register($_POST);
    $_SESSION['csrf']=bin2hex(random_bytes(32));
