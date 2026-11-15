@@ -1,25 +1,27 @@
 <?php
 declare(strict_types=1);
+ini_set('session.use_strict_mode','1');
+ini_set('session.cookie_httponly','1');
+ini_set('session.cookie_samesite','Lax');
+if (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS']!=='off') ini_set('session.cookie_secure','1');
 session_start();
+header('X-Content-Type-Options: nosniff');
+header('Referrer-Policy: strict-origin-when-cross-origin');
+header('X-Frame-Options: DENY');
 require dirname(__DIR__).'/src/bootstrap.php';
-$path = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH);
-if ($path === '/health') { header('Content-Type: application/json'); echo json_encode(['status'=>'ok']); exit; }
-if ($path === '/inscription' && $_SERVER['REQUEST_METHOD'] === 'POST') {
- if (!hash_equals($_SESSION['csrf'] ?? '', $_POST['csrf'] ?? '')) { http_response_code(419); exit('Session expirée'); }
- if (!empty($_POST['website'])) { http_response_code(400); exit; }
- $type = $_POST['type'] ?? '';
- $name = trim((string)($_POST['name'] ?? ''));
- $email = trim((string)($_POST['email'] ?? ''));
- $phone = trim((string)($_POST['phone'] ?? ''));
- if (!in_array($type,['etudiant','enseignant'],true) || mb_strlen($name)<3 || !filter_var($email,FILTER_VALIDATE_EMAIL) || strlen($phone)<6 || empty($_POST['consent'])) { http_response_code(422); exit('Informations invalides'); }
- try {
- $db = ssf_db();
- $stmt = $db->prepare('INSERT INTO registrations (type, full_name, email, phone, created_at) VALUES (?, ?, ?, ?, NOW())');
- $stmt->execute([$type,$name,$email,$phone]);
- header('Location: /merci',true,303); exit;
- } catch (Throwable $e) { error_log($e->getMessage()); http_response_code(503); exit('Service momentanément indisponible'); }
+require dirname(__DIR__).'/src/RegistrationRepository.php';
+require dirname(__DIR__).'/src/RegistrationService.php';
+require dirname(__DIR__).'/src/RegistrationController.php';
+$path=parse_url($_SERVER['REQUEST_URI']??'/',PHP_URL_PATH);
+$method=$_SERVER['REQUEST_METHOD']??'GET';
+if ($path==='/health' && $method==='GET') { header('Content-Type: application/json; charset=utf-8'); echo json_encode(['status'=>'ok']); exit; }
+if ($path==='/inscription' && $method==='POST') (new RegistrationController())->submit();
+if ($path==='/merci' && $method==='GET') { require dirname(__DIR__).'/views/thanks.php'; exit; }
+if ($path==='/confidentialite' && $method==='GET') { require dirname(__DIR__).'/views/privacy.php'; exit; }
+if ($path==='/' && $method==='GET') {
+ $_SESSION['csrf']??=bin2hex(random_bytes(32));
+ require dirname(__DIR__).'/views/home.php'; exit;
 }
-if ($path === '/merci') { echo '<!doctype html><html lang="fr"><meta charset="utf-8"><title>Merci</title><body><h1>Merci pour votre inscription !</h1><a href="/">Retour à l’accueil</a></body></html>'; exit; }
-if ($path !== '/') { http_response_code(404); exit('Page introuvable'); }
-$_SESSION['csrf'] ??= bin2hex(random_bytes(32));
-require dirname(__DIR__).'/views/home.php';
+http_response_code($path==='/inscription'?405:404);
+header('Content-Type: text/plain; charset=utf-8');
+echo $path==='/inscription'?'Méthode non autorisée':'Page introuvable';
