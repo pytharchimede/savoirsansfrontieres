@@ -45,7 +45,7 @@ final class AdminController {
     $stmt->execute($params);$rows=$stmt->fetchAll();
     if($export==='xlsx')AdminExport::xlsx($rows);AdminExport::pdf($rows);
    }
-   $stmt=$db->prepare('SELECT id,type,full_name,email,phone,subject,student_level,created_at FROM registrations'.$filter.' ORDER BY created_at DESC,id DESC LIMIT 30 OFFSET '.$offset);
+   $stmt=$db->prepare('SELECT r.id,r.type,r.full_name,r.email,r.phone,COALESCE(s.label,r.subject) subject,COALESCE(l.label,r.student_level) student_level,r.created_at FROM registrations r LEFT JOIN education_subjects s ON s.code=r.subject LEFT JOIN education_levels l ON l.code=r.student_level'.$filter.' ORDER BY r.created_at DESC,r.id DESC LIMIT 30 OFFSET '.$offset);
    $stmt->execute($params);$rows=$stmt->fetchAll();
    $body='<form method="get" class="filters"><input name="q" placeholder="Nom, email, téléphone" value="'.self::esc($q).'"><select name="type"><option value="">Tous les profils</option><option value="etudiant"'.($type==='etudiant'?' selected':'').'>Apprenants</option><option value="enseignant"'.($type==='enseignant'?' selected':'').'>Enseignants</option></select><button>Filtrer</button></form><p>'.$total.' inscription(s)</p>';
    $query=http_build_query(['q'=>$q,'type'=>$type]);
