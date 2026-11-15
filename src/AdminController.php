@@ -7,7 +7,7 @@ final class AdminController {
   $user=AdminAuth::user();$name=self::esc($user['username']??'');
   $nav=$user?'<nav><a href="/admin">Tableau de bord</a> <a href="/admin/inscriptions">Inscriptions</a> '.(AdminAuth::can('users.manage')?'<a href="/admin/utilisateurs">Utilisateurs</a> ':'').(AdminAuth::can('groups.manage')?'<a href="/admin/groupes">Groupes</a> ':'').(AdminAuth::can('catalogs.manage')?'<a href="/admin/referentiels">Matières et niveaux</a> ':'').'<form action="/admin/logout" method="post"><input type="hidden" name="csrf" value="'.AdminAuth::csrf().'"><button>Déconnexion ('.$name.')</button></form></nav>':'';
   header('Content-Type: text/html; charset=utf-8');header('Cache-Control: no-store');
-  echo '<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>'.self::esc($title).' — SSF Administration</title><link rel="stylesheet" href="/assets/admin.css"></head><body><header><a class="brand" href="/admin">✦ SAVOIR SANS FRONTIÈRES <small>Administration</small></a>'.$nav.'</header><main><h1>'.self::esc($title).'</h1>'.$body.'</main></body></html>';exit;
+  echo '<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>'.self::esc($title).' — SSF Administration</title><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css" referrerpolicy="no-referrer"><link rel="stylesheet" href="/assets/admin.css?v=20261115-premium"></head><body><header><a class="brand" href="/admin"><i class="fa-solid fa-diamond" aria-hidden="true"></i> SAVOIR SANS FRONTIÈRES <small>Administration</small></a>'.$nav.'</header><main><h1>'.self::esc($title).'</h1>'.$body.'</main></body></html>';exit;
  }
  private static function token(): string {return '<input type="hidden" name="csrf" value="'.self::esc(AdminAuth::csrf()).'">';}
  public static function route(string $path,string $method): never {
@@ -26,7 +26,7 @@ final class AdminController {
    $total=(int)$db->query('SELECT COUNT(*) FROM registrations')->fetchColumn();
    $learn=(int)$db->query("SELECT COUNT(*) FROM registrations WHERE type='etudiant'")->fetchColumn();
    $teach=$total-$learn;
-   self::page('Tableau de bord','<div class="metrics"><article><span>Total des inscrits</span><strong>'.$total.'</strong></article><article><span>Apprenants</span><strong>'.$learn.'</strong></article><article><span>Enseignants</span><strong>'.$teach.'</strong></article></div><p><a class="btn" href="/admin/inscriptions">Consulter les inscriptions →</a></p>');
+   self::page('Tableau de bord','<div class="metrics"><article><span>Total des inscrits</span><strong>'.$total.'</strong></article><article><span>Apprenants</span><strong>'.$learn.'</strong></article><article><span>Enseignants</span><strong>'.$teach.'</strong></article></div><p><a class="btn" href="/admin/inscriptions">Consulter les inscriptions <i class="fa-solid fa-arrow-right" aria-hidden="true"></i></a></p>');
   }
   if($path==='/admin/inscriptions' && $method==='GET'){
    AdminAuth::require('registrations.view');$db=ssf_db();
@@ -53,9 +53,9 @@ final class AdminController {
    $body.='<div class="tablewrap"><table><thead><tr><th>ID</th><th>Profil</th><th>Nom complet</th><th>Email</th><th>Téléphone</th><th>Matière</th><th>Classe / niveau</th><th>Inscrit le</th></tr></thead><tbody>';
    foreach($rows as $r){$body.='<tr>';foreach(['id','type','full_name','email','phone','subject','student_level','created_at'] as $k)$body.='<td>'.self::esc($r[$k]).'</td>';$body.='</tr>';}
    $body.='</tbody></table></div><div class="pagination">';
-   if($page>1)$body.='<a href="?'.$query.'&page='.($page-1).'">← Précédent</a> ';
+   if($page>1)$body.='<a href="?'.$query.'&page='.($page-1).'"><i class="fa-solid fa-arrow-left" aria-hidden="true"></i> Précédent</a> ';
    $body.='Page '.$page.' / '.max(1,(int)ceil($total/$perPage));
-   if($offset+$perPage<$total)$body.=' <a href="?'.$query.'&page='.($page+1).'">Suivant →</a>';
+   if($offset+$perPage<$total)$body.=' <a href="?'.$query.'&page='.($page+1).'">Suivant <i class="fa-solid fa-arrow-right" aria-hidden="true"></i></a>';
    self::page('Inscriptions',$body.'</div>');
   }
 
