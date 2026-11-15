@@ -1,18 +1,22 @@
 #!/usr/bin/env bash
 set -euo pipefail
-ROOT="/home/ifmapci"
+ROOT=/home/ifmapci
 REPO="$ROOT/repositories/savoirsansfrontieres"
-TARGET="$ROOT/savoirsansfrontieres.com"
+APP="$ROOT/ssf-app"
+WEB="$ROOT/savoirsansfrontieres.com"
 cd "$REPO"
-git fetch origin main
-git checkout main
-git pull --ff-only origin main
-test -f public/index.php || { echo "ERREUR: application absente sur main"; exit 1; }
-test -f "$TARGET/.env" || { echo "ERREUR: .env production absent"; exit 1; }
-mkdir -p "$ROOT/backups"
-tar -czf "$ROOT/backups/ssf-$(date +%Y%m%d-%H%M%S).tar.gz" -C "$TARGET" --exclude=.env . || true
-rsync -a --delete --exclude=.env --exclude=storage/ --exclude=vendor/ --exclude=.git/ "$REPO/" "$TARGET/"
-cd "$TARGET"
-if command -v composer >/dev/null; then composer install --no-dev --prefer-dist --optimize-autoloader --no-interaction; fi
-find app bootstrap core public routes resources -type f -name '*.php' -print0 | xargs -0 -n1 php -l >/dev/null
-echo "Déploiement terminé. Vérifier docroot public/ et migrations séparément."
+test "$(git branch --show-current)" = main || { echo "ERREUR: se placer sur main avant deploiement"; exit 1; }
+test -f public/index.php && test -f database/migrations/001_registrations.sql
+test -f "$APP/.env" || { echo "ERREUR: config $APP/.env manquante"; exit 1; }
+for file in public/index.php src/bootstrap.php views/home.php; do php -l "$file" || exit 1; done
+mkdir -p "$ROOT/backups" "$WEB" "$APP"
+stamp=$(date +%Y%m%d-%H%M%S)
+tar -czf "$ROOT/backups/ssf-web-$stamp.tar.gz" -C "$WEB" . 
+tar -czf "$ROOT/backups/ssf-app-$stamp.tar.gz" -C "$APP" --exclude=.env . 
+rsync -a --delete --exclude=.env --exclude=.git/ --exclude=public/ "$REPO/" "$APP/"
+mkdir -p "$WEB/assets"
+rsync -a "$REPO/public/assets/" "$WEB/assets/"
+cp "$REPO/public/.htaccess" "$WEB/.htaccess"
+sed "s@dirname(__DIR__)@dirname(__DIR__).'/ssf-app'@g" "$REPO/public/index.php" > "$WEB/index.php"
+php -l "$WEB/index.php"
+echo "Deploiement fichiers termine. Tester /health et les formulaires."
