@@ -9,6 +9,7 @@ header('X-Content-Type-Options: nosniff');
 header('Referrer-Policy: strict-origin-when-cross-origin');
 header('X-Frame-Options: DENY');
 require dirname(__DIR__).'/src/bootstrap.php';
+require dirname(__DIR__).'/src/Pricing.php';
 require dirname(__DIR__).'/src/RegistrationRepository.php';
 require dirname(__DIR__).'/src/RegistrationService.php';
 require dirname(__DIR__).'/src/RegistrationController.php';
