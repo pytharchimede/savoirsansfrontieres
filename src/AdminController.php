@@ -5,7 +5,7 @@ final class AdminController {
  private static function go(string $path): never {header('Location: '.$path,true,303);exit;}
  private static function page(string $title,string $body): never {
   $user=AdminAuth::user();$name=self::esc($user['username']??'');
-  $nav=$user?'<nav><a href="/admin">Tableau de bord</a> <a href="/admin/inscriptions">Inscriptions</a> '.(AdminAuth::can('users.manage')?'<a href="/admin/utilisateurs">Utilisateurs</a> ':'').(AdminAuth::can('groups.manage')?'<a href="/admin/groupes">Groupes</a> ':'').'<form action="/admin/logout" method="post"><input type="hidden" name="csrf" value="'.AdminAuth::csrf().'"><button>Déconnexion ('.$name.')</button></form></nav>':'';
+  $nav=$user?'<nav><a href="/admin">Tableau de bord</a> <a href="/admin/inscriptions">Inscriptions</a> '.(AdminAuth::can('users.manage')?'<a href="/admin/utilisateurs">Utilisateurs</a> ':'').(AdminAuth::can('groups.manage')?'<a href="/admin/groupes">Groupes</a> ':'').(AdminAuth::can('catalogs.manage')?'<a href="/admin/referentiels">Matières et niveaux</a> ':'').'<form action="/admin/logout" method="post"><input type="hidden" name="csrf" value="'.AdminAuth::csrf().'"><button>Déconnexion ('.$name.')</button></form></nav>':'';
   header('Content-Type: text/html; charset=utf-8');header('Cache-Control: no-store');
   echo '<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>'.self::esc($title).' — SSF Administration</title><link rel="stylesheet" href="/assets/admin.css"></head><body><header><a class="brand" href="/admin">✦ SAVOIR SANS FRONTIÈRES <small>Administration</small></a>'.$nav.'</header><main><h1>'.self::esc($title).'</h1>'.$body.'</main></body></html>';exit;
  }
@@ -45,7 +45,7 @@ final class AdminController {
     $stmt->execute($params);$rows=$stmt->fetchAll();
     if($export==='xlsx')AdminExport::xlsx($rows);AdminExport::pdf($rows);
    }
-   $stmt=$db->prepare('SELECT id,type,full_name,email,phone,created_at FROM registrations'.$filter.' ORDER BY created_at DESC,id DESC LIMIT 30 OFFSET '.$offset);
+   $stmt=$db->prepare('SELECT id,type,full_name,email,phone,subject,student_level,created_at FROM registrations'.$filter.' ORDER BY created_at DESC,id DESC LIMIT 30 OFFSET '.$offset);
    $stmt->execute($params);$rows=$stmt->fetchAll();
    $body='<form method="get" class="filters"><input name="q" placeholder="Nom, email, téléphone" value="'.self::esc($q).'"><select name="type"><option value="">Tous les profils</option><option value="etudiant"'.($type==='etudiant'?' selected':'').'>Apprenants</option><option value="enseignant"'.($type==='enseignant'?' selected':'').'>Enseignants</option></select><button>Filtrer</button></form><p>'.$total.' inscription(s)</p>';
    $query=http_build_query(['q'=>$q,'type'=>$type]);
@@ -57,6 +57,40 @@ final class AdminController {
    $body.='Page '.$page.' / '.max(1,(int)ceil($total/$perPage));
    if($offset+$perPage<$total)$body.=' <a href="?'.$query.'&page='.($page+1).'">Suivant →</a>';
    self::page('Inscriptions',$body.'</div>');
+  }
+
+  if($path==='/admin/referentiels'){
+   AdminAuth::require('catalogs.manage');$db=ssf_db();
+   $catalogs=['subject'=>['education_subjects','Matières'],'level'=>['education_levels','Niveaux d’études']];
+   if($method==='POST'){
+    AdminAuth::checkCsrf();$kind=(string)($_POST['kind']??'');
+    if(!isset($catalogs[$kind])){http_response_code(400);exit('Référentiel invalide');}
+    $table=$catalogs[$kind][0];$action=(string)($_POST['action']??'');
+    if($action==='create'){
+     $label=trim((string)($_POST['label']??''));
+     if(mb_strlen($label)<2||mb_strlen($label)>120){http_response_code(422);exit('Libellé invalide');}
+     $code='c'.bin2hex(random_bytes(8));
+     $s=$db->prepare("INSERT INTO $table(code,label,sort_order) VALUES(?,?,1000)");$s->execute([$code,$label]);
+    }elseif($action==='rename'){
+     $id=(int)($_POST['id']??0);$label=trim((string)($_POST['label']??''));
+     if($id<1||mb_strlen($label)<2||mb_strlen($label)>120){http_response_code(422);exit('Valeur invalide');}
+     $s=$db->prepare("UPDATE $table SET label=? WHERE id=?");$s->execute([$label,$id]);
+    }elseif($action==='toggle'){
+     $id=(int)($_POST['id']??0);if($id<1){http_response_code(422);exit('ID invalide');}
+     $s=$db->prepare("UPDATE $table SET active=1-active WHERE id=?");$s->execute([$id]);
+    }else{http_response_code(400);exit('Action invalide');}
+    self::go('/admin/referentiels');
+   }
+   $body='<p>Les éléments désactivés ne sont plus proposés aux nouveaux inscrits. Les inscriptions historiques restent conservées.</p>';
+   foreach($catalogs as $kind=>[$table,$title]){
+    $rows=$db->query("SELECT id,label,active FROM $table ORDER BY sort_order,label")->fetchAll();
+    $body.='<h2>'.self::esc($title).'</h2><div class="tablewrap"><table><tr><th>Libellé</th><th>État</th><th>Modifier</th><th>Disponibilité</th></tr>';
+    foreach($rows as $item){
+     $body.='<tr><td>'.self::esc($item['label']).'</td><td>'.($item['active']?'Actif':'Inactif').'</td><td><form method="post">'.self::token().'<input type="hidden" name="kind" value="'.$kind.'"><input type="hidden" name="action" value="rename"><input type="hidden" name="id" value="'.(int)$item['id'].'"><input name="label" maxlength="120" required value="'.self::esc($item['label']).'"><button>Enregistrer</button></form></td><td><form method="post">'.self::token().'<input type="hidden" name="kind" value="'.$kind.'"><input type="hidden" name="action" value="toggle"><input type="hidden" name="id" value="'.(int)$item['id'].'"><button>'.($item['active']?'Désactiver':'Activer').'</button></form></td></tr>';
+    }
+    $body.='</table></div><form method="post" class="panel">'.self::token().'<input type="hidden" name="kind" value="'.$kind.'"><input type="hidden" name="action" value="create"><label>Ajouter un élément<input name="label" maxlength="120" required></label><button>Ajouter</button></form>';
+   }
+   self::page('Matières et niveaux',$body);
   }
   if($path==='/admin/utilisateurs'){
    AdminAuth::require('users.manage');$db=ssf_db();
