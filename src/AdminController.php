@@ -5,9 +5,13 @@ final class AdminController {
  private static function go(string $path): never {header('Location: '.$path,true,303);exit;}
  private static function page(string $title,string $body): never {
   $user=AdminAuth::user();$name=self::esc($user['username']??'');
-  $nav=$user?'<nav><a href="/admin">Tableau de bord</a> <a href="/admin/inscriptions">Inscriptions</a> '.(AdminAuth::can('users.manage')?'<a href="/admin/utilisateurs">Utilisateurs</a> ':'').(AdminAuth::can('groups.manage')?'<a href="/admin/groupes">Groupes</a> ':'').(AdminAuth::can('catalogs.manage')?'<a href="/admin/referentiels">Matières et niveaux</a> ':'').(AdminAuth::can('pricing.manage')?'<a href="/admin/tarifs">Tarifs</a> ':'').'<form action="/admin/logout" method="post"><input type="hidden" name="csrf" value="'.AdminAuth::csrf().'"><button>Déconnexion ('.$name.')</button></form></nav>':'';
   header('Content-Type: text/html; charset=utf-8');header('Cache-Control: no-store');
-  echo '<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>'.self::esc($title).' — SSF Administration</title><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css" referrerpolicy="no-referrer"><link rel="stylesheet" href="/assets/admin.css?v=20261115-premium"></head><body><header><a class="brand" href="/admin"><i class="fa-solid fa-diamond" aria-hidden="true"></i> SAVOIR SANS FRONTIÈRES <small>Administration</small></a>'.$nav.'</header><main><h1>'.self::esc($title).'</h1>'.$body.'</main></body></html>';exit;
+  $head='<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>'.self::esc($title).' — SSF Administration</title><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css" referrerpolicy="no-referrer"><link rel="stylesheet" href="/assets/admin.css?v=20261115-sidebar1"></head><body>';
+  if(!$user){echo $head.'<div class="login-screen"><div class="login-shell"><div class="login-brand"><i class="fa-solid fa-graduation-cap"></i><span>SAVOIR SANS FRONTIÈRES<br><small>Espace administration</small></span></div><div class="page-kicker">Accès sécurisé</div><h1>'.self::esc($title).'</h1>'.$body.'</div></div></body></html>';exit;}
+  $path=(string)(parse_url($_SERVER['REQUEST_URI']??'/admin',PHP_URL_PATH)??'/admin');
+  $items=[['/admin','Tableau de bord','fa-chart-pie','registrations.view'],['/admin/inscriptions','Inscriptions','fa-address-card','registrations.view'],['/admin/referentiels','Matières et niveaux','fa-book-open','catalogs.manage'],['/admin/tarifs','Tarifs','fa-euro-sign','pricing.manage'],['/admin/utilisateurs','Utilisateurs','fa-users','users.manage'],['/admin/groupes','Groupes et accès','fa-shield-halved','groups.manage']];
+  $nav='';foreach($items as [$url,$label,$icon,$permission]){if(!AdminAuth::can($permission))continue;$active=$path===$url?' active':'';$current=$active?' aria-current="page"':'';$nav.='<a class="'.$active.'" href="'.$url.'"'.$current.'><i class="fa-solid '.$icon.'" aria-hidden="true"></i><span>'.self::esc($label).'</span></a>';}
+  echo $head.'<div class="admin-shell"><aside class="sidebar" id="admin-sidebar" data-sidebar><a class="sidebar-brand" href="/admin"><span class="brand-icon"><i class="fa-solid fa-graduation-cap" aria-hidden="true"></i></span><span class="brand-name">SAVOIR SANS FRONTIÈRES<small>ESPACE ADMINISTRATION</small></span></a><div class="sidebar-label">Navigation</div><nav class="sidebar-nav" aria-label="Navigation principale">'.$nav.'</nav><div class="sidebar-bottom"><div class="sidebar-user"><i class="fa-solid fa-circle-user" aria-hidden="true"></i><span>'. $name .'</span></div><form action="/admin/logout" method="post">'.self::token().'<button type="submit"><i class="fa-solid fa-arrow-right-from-bracket" aria-hidden="true"></i>Déconnexion</button></form></div></aside><div class="backdrop" data-backdrop></div><div class="workspace"><header class="topbar"><button class="menu-toggle" type="button" data-menu-toggle aria-label="Ouvrir le menu" aria-expanded="false" aria-controls="admin-sidebar"><i class="fa-solid fa-bars"></i></button><span class="topbar-caption">Savoir Sans Frontières / Administration</span><div class="topbar-right"><a href="/" target="_blank" rel="noopener noreferrer"><i class="fa-solid fa-arrow-up-right-from-square"></i> Voir le site</a><span class="topbar-avatar"><i class="fa-solid fa-user"></i></span></div></header><main class="content"><div class="page-heading"><div><div class="page-kicker">Espace de gestion</div><h1>'.self::esc($title).'</h1></div></div>'.$body.'</main></div></div><script defer src="/assets/admin.js?v=20261115-sidebar1"></script></body></html>';exit;
  }
  private static function token(): string {return '<input type="hidden" name="csrf" value="'.self::esc(AdminAuth::csrf()).'">';}
  public static function route(string $path,string $method): never {
@@ -26,7 +30,11 @@ final class AdminController {
    $total=(int)$db->query('SELECT COUNT(*) FROM registrations')->fetchColumn();
    $learn=(int)$db->query("SELECT COUNT(*) FROM registrations WHERE type='etudiant'")->fetchColumn();
    $teach=$total-$learn;
-   self::page('Tableau de bord','<div class="metrics"><article><span>Total des inscrits</span><strong>'.$total.'</strong></article><article><span>Apprenants</span><strong>'.$learn.'</strong></article><article><span>Enseignants</span><strong>'.$teach.'</strong></article></div><p><a class="btn" href="/admin/inscriptions">Consulter les inscriptions <i class="fa-solid fa-arrow-right" aria-hidden="true"></i></a></p>');
+   $links='<div class="quick-links"><a class="feature-tile" href="/admin/inscriptions"><i class="fa-solid fa-address-card"></i>Consulter les inscriptions</a>';
+   if(AdminAuth::can('pricing.manage'))$links.='<a class="feature-tile" href="/admin/tarifs"><i class="fa-solid fa-euro-sign"></i>Gérer les tarifs</a>';
+   if(AdminAuth::can('catalogs.manage'))$links.='<a class="feature-tile" href="/admin/referentiels"><i class="fa-solid fa-book-open"></i>Matières et niveaux</a>';
+   $links.='</div>';
+   self::page('Tableau de bord','<div class="metrics"><article><i class="fa-solid fa-users"></i><span>Total des inscrits</span><strong>'.$total.'</strong></article><article><i class="fa-solid fa-graduation-cap"></i><span>Apprenants</span><strong>'.$learn.'</strong></article><article><i class="fa-solid fa-chalkboard-user"></i><span>Enseignants</span><strong>'.$teach.'</strong></article></div><h2>Accès rapides</h2>'.$links);
   }
   if($path==='/admin/inscriptions' && $method==='GET'){
    AdminAuth::require('registrations.view');$db=ssf_db();
@@ -50,12 +58,20 @@ final class AdminController {
    $body='<form method="get" class="filters"><input name="q" placeholder="Nom, email, téléphone" value="'.self::esc($q).'"><select name="type"><option value="">Tous les profils</option><option value="etudiant"'.($type==='etudiant'?' selected':'').'>Apprenants</option><option value="enseignant"'.($type==='enseignant'?' selected':'').'>Enseignants</option></select><button>Filtrer</button></form><p>'.$total.' inscription(s)</p>';
    $query=http_build_query(['q'=>$q,'type'=>$type]);
    if(AdminAuth::can('registrations.export'))$body.='<p><a class="btn" href="/admin/inscriptions?'.$query.'&export=xlsx">Exporter Excel (.xlsx)</a> <a class="btn secondary" href="/admin/inscriptions?'.$query.'&export=pdf">Exporter PDF</a></p>';
-   $body.='<div class="tablewrap"><table><thead><tr><th>ID</th><th>Profil</th><th>Nom complet</th><th>Email</th><th>Téléphone</th><th>Matière</th><th>Classe / niveau</th><th>Inscrit le</th></tr></thead><tbody>';
-   foreach($rows as $r){$body.='<tr>';foreach(['id','type','full_name','email','phone','subject','student_level','created_at'] as $k)$body.='<td>'.self::esc($r[$k]).'</td>';$body.='</tr>';}
-   $body.='</tbody></table></div><div class="pagination">';
-   if($page>1)$body.='<a href="?'.$query.'&page='.($page-1).'"><i class="fa-solid fa-arrow-left" aria-hidden="true"></i> Précédent</a> ';
-   $body.='Page '.$page.' / '.max(1,(int)ceil($total/$perPage));
-   if($offset+$perPage<$total)$body.=' <a href="?'.$query.'&page='.($page+1).'">Suivant <i class="fa-solid fa-arrow-right" aria-hidden="true"></i></a>';
+   $body.='<div class="records">';
+   foreach($rows as $r){
+    $body.='<article class="record-card"><div class="record-top"><h3>'.self::esc($r['full_name']).'</h3><span class="status">'.($r['type']==='etudiant'?'Apprenant':'Enseignant').'</span></div><dl class="record-meta">';
+    foreach(['email'=>'Email','phone'=>'Téléphone','subject'=>'Matière','student_level'=>'Niveau','created_at'=>'Inscrit le'] as $key=>$label){
+     if(($r[$key]??'')==='')continue;
+     $body.='<div><dt>'.$label.'</dt><dd>'.self::esc($r[$key]).'</dd></div>';
+    }
+    $body.='</dl></article>';
+   }
+   if(!$rows)$body.='<div class="empty-state"><i class="fa-solid fa-inbox"></i>Aucune inscription pour ces critères.</div>';
+   $body.='</div><div class="pagination">';
+   if($page>1)$body.='<a href="?'.$query.'&page='.($page-1).'"><i class="fa-solid fa-arrow-left"></i> Précédent</a> ';
+   $body.='<span>Page '.$page.' / '.max(1,(int)ceil($total/$perPage)).'</span>';
+   if($offset+$perPage<$total)$body.='<a href="?'.$query.'&page='.($page+1).'">Suivant <i class="fa-solid fa-arrow-right"></i></a>';
    self::page('Inscriptions',$body.'</div>');
   }
 
@@ -121,11 +137,11 @@ final class AdminController {
    $body='<p>Les éléments désactivés ne sont plus proposés aux nouveaux inscrits. Les inscriptions historiques restent conservées.</p>';
    foreach($catalogs as $kind=>[$table,$title]){
     $rows=$db->query("SELECT id,label,active FROM $table ORDER BY sort_order,label")->fetchAll();
-    $body.='<h2>'.self::esc($title).'</h2><div class="tablewrap"><table><tr><th>Libellé</th><th>État</th><th>Modifier</th><th>Disponibilité</th></tr>';
+    $body.='<h2>'.self::esc($title).'</h2><div class="records">';
     foreach($rows as $item){
-     $body.='<tr><td>'.self::esc($item['label']).'</td><td>'.($item['active']?'Actif':'Inactif').'</td><td><form method="post">'.self::token().'<input type="hidden" name="kind" value="'.$kind.'"><input type="hidden" name="action" value="rename"><input type="hidden" name="id" value="'.(int)$item['id'].'"><input name="label" maxlength="120" required value="'.self::esc($item['label']).'"><button>Enregistrer</button></form></td><td><form method="post">'.self::token().'<input type="hidden" name="kind" value="'.$kind.'"><input type="hidden" name="action" value="toggle"><input type="hidden" name="id" value="'.(int)$item['id'].'"><button>'.($item['active']?'Désactiver':'Activer').'</button></form></td></tr>';
+     $body.='<article class="record-card"><div class="record-top"><h3>'.self::esc($item['label']).'</h3><span class="status '.($item['active']?'active':'').'">'.($item['active']?'Actif':'Inactif').'</span></div><form method="post">'.self::token().'<input type="hidden" name="kind" value="'.$kind.'"><input type="hidden" name="action" value="rename"><input type="hidden" name="id" value="'.(int)$item['id'].'"><label>Libellé<input name="label" maxlength="120" required value="'.self::esc($item['label']).'"></label><div class="record-actions"><button>Enregistrer</button></div></form><div class="record-actions"><form method="post">'.self::token().'<input type="hidden" name="kind" value="'.$kind.'"><input type="hidden" name="action" value="toggle"><input type="hidden" name="id" value="'.(int)$item['id'].'"><button>'.($item['active']?'Désactiver':'Activer').'</button></form></div></article>';
     }
-    $body.='</table></div><form method="post" class="panel">'.self::token().'<input type="hidden" name="kind" value="'.$kind.'"><input type="hidden" name="action" value="create"><label>Ajouter un élément<input name="label" maxlength="120" required></label><button>Ajouter</button></form>';
+    $body.='</div><form method="post" class="panel">'.self::token().'<input type="hidden" name="kind" value="'.$kind.'"><input type="hidden" name="action" value="create"><label>Ajouter un élément<input name="label" maxlength="120" required></label><button>Ajouter</button></form>';
    }
    self::page('Matières et niveaux',$body);
   }
@@ -148,9 +164,9 @@ final class AdminController {
    }
    $users=$db->query("SELECT u.id,u.username,u.active,GROUP_CONCAT(g.name ORDER BY g.name SEPARATOR ', ') groups_list FROM admin_users u LEFT JOIN admin_user_groups ug ON ug.user_id=u.id LEFT JOIN admin_groups g ON g.id=ug.group_id GROUP BY u.id,u.username,u.active ORDER BY u.id")->fetchAll();
    $groups=$db->query('SELECT id,name FROM admin_groups ORDER BY name')->fetchAll();
-   $body='<div class="tablewrap"><table><tr><th>Identifiant</th><th>Groupes</th><th>État</th><th>Action</th></tr>';
-   foreach($users as $u)$body.='<tr><td>'.self::esc($u['username']).'</td><td>'.self::esc($u['groups_list']).'</td><td>'.($u['active']?'Actif':'Inactif').'</td><td><form method="post">'.self::token().'<input type="hidden" name="action" value="toggle"><input type="hidden" name="id" value="'.(int)$u['id'].'"><button>'.($u['active']?'Désactiver':'Activer').'</button></form></td></tr>';
-   $body.='</table></div><h2>Créer un utilisateur</h2><form method="post" class="panel">'.self::token().'<input type="hidden" name="action" value="create"><label>Identifiant<input name="username" required minlength="3"></label><label>Mot de passe initial<input name="password" type="password" minlength="12" required></label><fieldset><legend>Groupes</legend>';
+   $body='<div class="records">';
+   foreach($users as $u)$body.='<article class="record-card"><div class="record-top"><h3><i class="fa-solid fa-circle-user"></i> '.self::esc($u['username']).'</h3><span class="status '.($u['active']?'active':'').'">'.($u['active']?'Actif':'Inactif').'</span></div><dl class="record-meta"><div><dt>Groupes</dt><dd>'.self::esc($u['groups_list']).'</dd></div></dl><div class="record-actions"><form method="post">'.self::token().'<input type="hidden" name="action" value="toggle"><input type="hidden" name="id" value="'.(int)$u['id'].'"><button>'.($u['active']?'Désactiver':'Activer').'</button></form></div></article>';
+   $body.='</div><h2>Créer un utilisateur</h2><form method="post" class="panel">'.self::token().'<input type="hidden" name="action" value="create"><label>Identifiant<input name="username" required minlength="3"></label><label>Mot de passe initial<input name="password" type="password" minlength="12" required></label><fieldset><legend>Groupes</legend>';
    foreach($groups as $g)$body.='<label class="check"><input type="checkbox" name="groups[]" value="'.(int)$g['id'].'"> '.self::esc($g['name']).'</label>';
    self::page('Utilisateurs',$body.'</fieldset><button>Créer le compte</button></form>');
   }
@@ -175,11 +191,12 @@ final class AdminController {
    $assigned=$db->query('SELECT group_id,permission_id FROM admin_group_permissions')->fetchAll();$map=[];
    foreach($assigned as $a)$map[(int)$a['group_id']][(int)$a['permission_id']]=true;
    $body='<p>Les permissions du groupe Administrateurs sont protégées.</p>';
-   foreach($groups as $g){$locked=$g['name']==='Administrateurs';$body.='<form method="post" class="panel"><h2>'.self::esc($g['name']).'</h2>'.self::token().'<input type="hidden" name="action" value="permissions"><input type="hidden" name="group_id" value="'.(int)$g['id'].'">';
+   $body.='<div class="records">';
+   foreach($groups as $g){$locked=$g['name']==='Administrateurs';$body.='<form method="post" class="record-card"><h2>'.self::esc($g['name']).'</h2>'.self::token().'<input type="hidden" name="action" value="permissions"><input type="hidden" name="group_id" value="'.(int)$g['id'].'">';
     foreach($perms as $p)$body.='<label class="check"><input type="checkbox" name="permissions[]" value="'.(int)$p['id'].'" '.(!empty($map[(int)$g['id']][(int)$p['id']])?'checked ':'').($locked?'disabled':'').'> '.self::esc($p['label']).' <small>('.self::esc($p['code']).')</small></label>';
     if(!$locked)$body.='<button>Enregistrer les permissions</button>';$body.='</form>';
    }
-   self::page('Groupes et permissions',$body.'<h2>Créer un groupe</h2><form method="post" class="panel">'.self::token().'<input type="hidden" name="action" value="create"><label>Nom du groupe<input name="name" maxlength="100" required></label><button>Créer</button></form>');
+   self::page('Groupes et permissions',$body.'</div><h2>Créer un groupe</h2><form method="post" class="panel">'.self::token().'<input type="hidden" name="action" value="create"><label>Nom du groupe<input name="name" maxlength="100" required></label><button>Créer</button></form>');
   }
   http_response_code(404);exit('Page introuvable');
  }
