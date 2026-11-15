@@ -4,10 +4,11 @@ if(PHP_SAPI!=='cli'){http_response_code(403);exit;}
 require dirname(__DIR__).'/src/bootstrap.php';
 $username=$argv[1]??'admin';
 if(!preg_match('/^[a-zA-Z0-9._-]{3,80}$/',$username)){fwrite(STDERR,"Identifiant invalide\n");exit(1);}
-fwrite(STDOUT,"Mot de passe initial pour $username (12 caractères min., une majuscule et un chiffre) : ");
+fwrite(STDOUT,"Mot de passe initial pour $username (admin temporaire autorisé, sinon 12 caractères min.) : ");
 system('stty -echo');
 try{$password=rtrim((string)fgets(STDIN),"\r\n");}finally{system('stty echo');fwrite(STDOUT,"\n");}
-if(strlen($password)<12||!preg_match('/[A-Z]/',$password)||!preg_match('/[0-9]/',$password)){fwrite(STDERR,"Mot de passe trop faible\n");exit(1);}
+if($password!=='admin' && (strlen($password)<12||!preg_match('/[A-Z]/',$password)||!preg_match('/[0-9]/',$password))){fwrite(STDERR,"Mot de passe trop faible\n");exit(1);}
+if($username==='admin' && $password==='admin') fwrite(STDOUT,"AVERTISSEMENT : compte temporaire admin/admin. Désactivez-le avant ouverture publique.\n");
 $db=ssf_db();
 $stmt=$db->prepare('SELECT id FROM admin_groups WHERE name=?');$stmt->execute(['Administrateurs']);$gid=$stmt->fetchColumn();
 if(!$gid){fwrite(STDERR,"Migration 002_admin_rbac.sql requise\n");exit(1);}
