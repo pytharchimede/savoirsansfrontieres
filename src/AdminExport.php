@@ -2,22 +2,33 @@
 declare(strict_types=1);
 final class AdminExport {
  public static function xlsx(array $rows): never {
-  if (!class_exists('ZipArchive')) { http_response_code(503);exit('Extension PHP zip nécessaire pour Excel'); }
   $headers=['ID','Profil','Nom et prénom','Email','Téléphone','Date inscription'];
   $xml='<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData>';
   $all=array_merge([$headers],array_map(fn($r)=>[(string)$r['id'],$r['type'],$r['full_name'],$r['email'],$r['phone'],$r['created_at']],$rows));
   foreach($all as $i=>$line){$xml.='<row r="'.($i+1).'">';foreach($line as $j=>$v){$letter=chr(65+$j);$xml.='<c r="'.$letter.($i+1).'" t="inlineStr"><is><t>'.htmlspecialchars((string)$v,ENT_XML1|ENT_QUOTES,'UTF-8').'</t></is></c>';}$xml.='</row>';}
   $xml.='</sheetData></worksheet>';
-  $tmp=tempnam(sys_get_temp_dir(),'ssf_xlsx_');$zip=new ZipArchive();
-  if($zip->open($tmp,ZipArchive::OVERWRITE)!==true){http_response_code(503);exit('Export indisponible');}
-  $zip->addFromString('[Content_Types].xml','<?xml version="1.0" encoding="UTF-8"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/></Types>');
-  $zip->addFromString('_rels/.rels','<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>');
-  $zip->addFromString('xl/workbook.xml','<?xml version="1.0" encoding="UTF-8"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="Inscriptions" sheetId="1" r:id="rId1"/></sheets></workbook>');
-  $zip->addFromString('xl/_rels/workbook.xml.rels','<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/></Relationships>');
-  $zip->addFromString('xl/worksheets/sheet1.xml',$xml);$zip->close();
+  $files=[
+   '[Content_Types].xml'=>'<?xml version="1.0" encoding="UTF-8"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/></Types>',
+   '_rels/.rels'=>'<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>',
+   'xl/workbook.xml'=>'<?xml version="1.0" encoding="UTF-8"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="Inscriptions" sheetId="1" r:id="rId1"/></sheets></workbook>',
+   'xl/_rels/workbook.xml.rels'=>'<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/></Relationships>',
+   'xl/worksheets/sheet1.xml'=>$xml
+  ];
+  $xlsx=self::zipStore($files);
   header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
   header('Content-Disposition: attachment; filename="ssf-inscriptions-'.date('Ymd').'.xlsx"');
-  header('Cache-Control: no-store');readfile($tmp);unlink($tmp);exit;
+  header('Cache-Control: no-store');echo $xlsx;exit;
+ }
+ private static function zipStore(array $files): string {
+  $body='';$central='';$offset=0;$count=0;
+  foreach($files as $name=>$content){
+   $name=(string)$name;$content=(string)$content;$size=strlen($content);$crc=(int)sprintf('%u',crc32($content));$time=0;$date=33;
+   $local=pack('VvvvvvVVVvv',0x04034b50,20,0,0,$time,$date,$crc,$size,$size,strlen($name),0);
+   $body.=$local.$name.$content;
+   $central.=pack('VvvvvvvVVVvvvvvVV',0x02014b50,20,20,0,0,$time,$date,$crc,$size,$size,strlen($name),0,0,0,0,0,$offset).$name;
+   $offset+=strlen($local)+strlen($name)+$size;$count++;
+  }
+  return $body.$central.pack('VvvvvVVv',0x06054b50,0,0,$count,$count,strlen($central),strlen($body),0);
  }
  public static function pdf(array $rows): never {
   // PDF simple sans dépendance externe ; caractères convertis pour les polices PDF standard.
