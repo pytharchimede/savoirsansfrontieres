@@ -33,15 +33,15 @@ final class AdminController {
    $type=(string)($_GET['type']??'');if(!in_array($type,['','etudiant','enseignant'],true))$type='';
    $q=trim((string)($_GET['q']??''));$q=mb_substr($q,0,100);
    $where=[];$params=[];
-   if($type!==''){$where[]='type=?';$params[]=$type;}
-   if($q!==''){$where[]='(full_name LIKE ? OR email LIKE ? OR phone LIKE ?)';for($i=0;$i<3;$i++)$params[]='%'.$q.'%';}
+   if($type!==''){$where[]='r.type=?';$params[]=$type;}
+   if($q!==''){$where[]='(r.full_name LIKE ? OR r.email LIKE ? OR r.phone LIKE ?)';for($i=0;$i<3;$i++)$params[]='%'.$q.'%';}
    $filter=$where?' WHERE '.implode(' AND ',$where):'';
-   $stmt=$db->prepare('SELECT COUNT(*) FROM registrations'.$filter);$stmt->execute($params);$total=(int)$stmt->fetchColumn();
+   $stmt=$db->prepare('SELECT COUNT(*) FROM registrations r'.$filter);$stmt->execute($params);$total=(int)$stmt->fetchColumn();
    $page=max(1,(int)($_GET['page']??1));$perPage=30;$offset=($page-1)*$perPage;
    $export=(string)($_GET['export']??'');
    if($export!==''){AdminAuth::require('registrations.export');if(!in_array($export,['pdf','xlsx'],true)){http_response_code(400);exit('Format invalide');}
     if($total>5000){http_response_code(413);exit('Export limité à 5000 lignes. Affinez vos filtres.');}
-    $stmt=$db->prepare('SELECT id,type,full_name,email,phone,subject,student_level,created_at FROM registrations'.$filter.' ORDER BY created_at DESC,id DESC');
+    $stmt=$db->prepare('SELECT r.id,r.type,r.full_name,r.email,r.phone,COALESCE(s.label,r.subject) subject,COALESCE(l.label,r.student_level) student_level,r.created_at FROM registrations r LEFT JOIN education_subjects s ON s.code=r.subject LEFT JOIN education_levels l ON l.code=r.student_level'.$filter.' ORDER BY r.created_at DESC,r.id DESC');
     $stmt->execute($params);$rows=$stmt->fetchAll();
     if($export==='xlsx')AdminExport::xlsx($rows);AdminExport::pdf($rows);
    }
