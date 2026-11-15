@@ -41,11 +41,11 @@ final class AdminController {
    $export=(string)($_GET['export']??'');
    if($export!==''){AdminAuth::require('registrations.export');if(!in_array($export,['pdf','xlsx'],true)){http_response_code(400);exit('Format invalide');}
     if($total>5000){http_response_code(413);exit('Export limité à 5000 lignes. Affinez vos filtres.');}
-    $stmt=$db->prepare('SELECT r.id,r.type,r.full_name,r.email,r.phone,COALESCE(s.label,r.subject) subject,COALESCE(l.label,r.student_level) student_level,r.created_at FROM registrations r LEFT JOIN education_subjects s ON s.code=r.subject LEFT JOIN education_levels l ON l.code=r.student_level'.$filter.' ORDER BY r.created_at DESC,r.id DESC');
+    $stmt=$db->prepare('SELECT r.id,r.type,r.full_name,r.email,r.phone,COALESCE(s.label,r.subject) subject,COALESCE(l.label,r.student_level) student_level,r.created_at FROM registrations r LEFT JOIN education_subjects s ON s.code COLLATE utf8mb4_unicode_ci = r.subject COLLATE utf8mb4_unicode_ci LEFT JOIN education_levels l ON l.code COLLATE utf8mb4_unicode_ci = r.student_level COLLATE utf8mb4_unicode_ci'.$filter.' ORDER BY r.created_at DESC,r.id DESC');
     $stmt->execute($params);$rows=$stmt->fetchAll();
     if($export==='xlsx')AdminExport::xlsx($rows);AdminExport::pdf($rows);
    }
-   $stmt=$db->prepare('SELECT r.id,r.type,r.full_name,r.email,r.phone,COALESCE(s.label,r.subject) subject,COALESCE(l.label,r.student_level) student_level,r.created_at FROM registrations r LEFT JOIN education_subjects s ON s.code=r.subject LEFT JOIN education_levels l ON l.code=r.student_level'.$filter.' ORDER BY r.created_at DESC,r.id DESC LIMIT 30 OFFSET '.$offset);
+   $stmt=$db->prepare('SELECT r.id,r.type,r.full_name,r.email,r.phone,COALESCE(s.label,r.subject) subject,COALESCE(l.label,r.student_level) student_level,r.created_at FROM registrations r LEFT JOIN education_subjects s ON s.code COLLATE utf8mb4_unicode_ci = r.subject COLLATE utf8mb4_unicode_ci LEFT JOIN education_levels l ON l.code COLLATE utf8mb4_unicode_ci = r.student_level COLLATE utf8mb4_unicode_ci'.$filter.' ORDER BY r.created_at DESC,r.id DESC LIMIT 30 OFFSET '.$offset);
    $stmt->execute($params);$rows=$stmt->fetchAll();
    $body='<form method="get" class="filters"><input name="q" placeholder="Nom, email, téléphone" value="'.self::esc($q).'"><select name="type"><option value="">Tous les profils</option><option value="etudiant"'.($type==='etudiant'?' selected':'').'>Apprenants</option><option value="enseignant"'.($type==='enseignant'?' selected':'').'>Enseignants</option></select><button>Filtrer</button></form><p>'.$total.' inscription(s)</p>';
    $query=http_build_query(['q'=>$q,'type'=>$type]);
