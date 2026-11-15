@@ -8,7 +8,7 @@
 4. Créer le premier administrateur en SSH : `cd /home/ifmapci/ssf-app && php scripts/create_admin.php admin`. Le mot de passe est saisi sans écho, haché avec password_hash et jamais conservé en clair.
 5. Se connecter sur `https://savoirsansfrontieres.com/admin/login`.
 
-**Ne jamais utiliser admin/admin en production.** Le compte initial est `admin` avec un mot de passe fort choisi à l'installation.
+Pour les essais uniquement, le script autorise explicitement `admin/admin`. Ne pas exposer ce compte sur le domaine public : créer les véritables comptes et désactiver le compte provisoire avant le déploiement.
 
 ## Groupes prédéfinis
 
@@ -26,5 +26,5 @@ Les nouveaux utilisateurs peuvent être affectés à un ou plusieurs groupes. Le
 - Les utilisateurs sans permission export ne voient pas les boutons et reçoivent HTTP 403 en accès direct.
 - Les mutations exigent un jeton CSRF.
 - Les tentatives de connexion sont limitées à huit échecs sur quinze minutes (nom d'utilisateur ou IP hachée).
-- L'extension PHP ZipArchive est nécessaire pour exporter en XLSX. Le PDF utilise un générateur léger sans dépendance externe, avec translittération des caractères et mise en page simple.
+- L'export XLSX est généré sans ZipArchive, compatible avec PHP 8.5 et sans dépendance externe. Le PDF utilise un générateur léger sans dépendance externe, avec translittération des caractères et mise en page simple.
 - Ne jamais exécuter la création d'administrateur dans un navigateur.
