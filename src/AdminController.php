@@ -5,7 +5,7 @@ final class AdminController {
  private static function go(string $path): never {header('Location: '.$path,true,303);exit;}
  private static function page(string $title,string $body): never {
   $user=AdminAuth::user();$name=self::esc($user['username']??'');
-  $nav=$user?'<nav><a href="/admin">Tableau de bord</a> <a href="/admin/inscriptions">Inscriptions</a> '.(AdminAuth::can('users.manage')?'<a href="/admin/utilisateurs">Utilisateurs</a> ':'').(AdminAuth::can('groups.manage')?'<a href="/admin/groupes">Groupes</a> ':'').(AdminAuth::can('catalogs.manage')?'<a href="/admin/referentiels">Matières et niveaux</a> ':'').'<form action="/admin/logout" method="post"><input type="hidden" name="csrf" value="'.AdminAuth::csrf().'"><button>Déconnexion ('.$name.')</button></form></nav>':'';
+  $nav=$user?'<nav><a href="/admin">Tableau de bord</a> <a href="/admin/inscriptions">Inscriptions</a> '.(AdminAuth::can('users.manage')?'<a href="/admin/utilisateurs">Utilisateurs</a> ':'').(AdminAuth::can('groups.manage')?'<a href="/admin/groupes">Groupes</a> ':'').(AdminAuth::can('catalogs.manage')?'<a href="/admin/referentiels">Matières et niveaux</a> ':'').(AdminAuth::can('pricing.manage')?'<a href="/admin/tarifs">Tarifs</a> ':'').'<form action="/admin/logout" method="post"><input type="hidden" name="csrf" value="'.AdminAuth::csrf().'"><button>Déconnexion ('.$name.')</button></form></nav>':'';
   header('Content-Type: text/html; charset=utf-8');header('Cache-Control: no-store');
   echo '<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>'.self::esc($title).' — SSF Administration</title><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css" referrerpolicy="no-referrer"><link rel="stylesheet" href="/assets/admin.css?v=20261115-premium"></head><body><header><a class="brand" href="/admin"><i class="fa-solid fa-diamond" aria-hidden="true"></i> SAVOIR SANS FRONTIÈRES <small>Administration</small></a>'.$nav.'</header><main><h1>'.self::esc($title).'</h1>'.$body.'</main></body></html>';exit;
  }
@@ -59,6 +59,43 @@ final class AdminController {
    self::page('Inscriptions',$body.'</div>');
   }
 
+  if($path==='/admin/tarifs'){
+   AdminAuth::require('pricing.manage');$db=ssf_db();
+   if($method==='POST'){
+    AdminAuth::checkCsrf();
+    $values=[];
+    foreach(['hourly','monthly'] as $code){
+     $raw=trim((string)($_POST[$code]??''));
+     if(!preg_match('/^(?:0|[1-9][0-9]{0,5})(?:[.,][0-9]{1,2})?$/D',$raw)){
+      http_response_code(422);exit('Montant invalide : utilisez un montant positif en euros, avec deux décimales maximum.');
+     }
+     $parts=explode('.',str_replace(',','.',$raw),2);
+     $cents=(int)$parts[0]*100+(int)str_pad($parts[1]??'',2,'0');
+     if($cents<1||$cents>99999999){http_response_code(422);exit('Montant hors limites');}
+     $values[$code]=$cents;
+    }
+    $db->beginTransaction();
+    try{
+     $stmt=$db->prepare('UPDATE site_pricing SET amount_cents=? WHERE code=?');
+     foreach($values as $code=>$amount){$stmt->execute([$amount,$code]);if($stmt->rowCount()===0){
+      $check=$db->prepare('SELECT 1 FROM site_pricing WHERE code=?');$check->execute([$code]);
+      if(!$check->fetchColumn()){$ins=$db->prepare('INSERT INTO site_pricing(code,amount_cents) VALUES(?,?)');$ins->execute([$code,$amount]);}
+     }}
+     $db->commit();
+    }catch(Throwable $e){if($db->inTransaction())$db->rollBack();throw $e;}
+    self::go('/admin/tarifs?updated=1');
+   }
+   if($method!=='GET'){http_response_code(405);exit('Méthode non autorisée');}
+   $prices=ssf_pricing();
+   $body='<p>Modifiez les tarifs affichés sur la page d’accueil. Les montants sont exprimés en euros (€) et enregistrés immédiatement.</p>';
+   if(isset($_GET['updated']))$body.='<p class="notice">Tarifs enregistrés avec succès.</p>';
+   $body.='<form method="post" class="panel">'.self::token()
+    .'<label>Tarif horaire (€)<input name="hourly" type="number" min="0.01" max="999999.99" step="0.01" inputmode="decimal" required value="'.self::esc(number_format($prices['hourly']/100,2,'.','')).'"></label>'
+    .'<label>Forfait mensuel — 8 heures (€)<input name="monthly" type="number" min="0.01" max="999999.99" step="0.01" inputmode="decimal" required value="'.self::esc(number_format($prices['monthly']/100,2,'.','')).'"></label>'
+    .'<p>Le tarif horaire indicatif du forfait mensuel est calculé automatiquement (forfait ÷ 8).</p>'
+    .'<button type="submit">Enregistrer les tarifs</button></form>';
+   self::page('Gestion des tarifs',$body);
+  }
   if($path==='/admin/referentiels'){
    AdminAuth::require('catalogs.manage');$db=ssf_db();
    $catalogs=['subject'=>['education_subjects','Matières'],'level'=>['education_levels','Niveaux d’études']];
