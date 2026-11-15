@@ -35,5 +35,5 @@ test "$code" = 200
 php -r '$f=file_get_contents($argv[1]);if(substr($f,0,5)!=="%PDF-")exit(1);echo "En-tête PDF : OK\n";' "$TMP/export.pdf"
 code=$(curl -sS -o /dev/null -w '%{http_code}' "$BASE/admin/inscriptions?export=xlsx")
 echo "Export sans session : HTTP $code"
-test "$code" = 302
+test "$code" = 303
 echo 'SUCCES : tests administration terminés'
