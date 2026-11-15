@@ -12,3 +12,7 @@ document.querySelectorAll('[data-search-select]').forEach(box=>{
  document.addEventListener('click',e=>{if(!box.contains(e.target))close();});
  const form=box.closest('form');form.addEventListener('submit',e=>{if(hidden.disabled)return;if(!hidden.value){e.preventDefault();search.setCustomValidity('Choisissez une valeur dans la liste.');search.reportValidity();search.focus();show();}});
 });
+
+
+// Responsive navigation: accessible toggle, close after navigation.
+(()=>{const toggle=document.querySelector('.mobile-menu-toggle');const nav=document.getElementById('primary-navigation');if(!toggle||!nav)return;const close=()=>{nav.classList.remove('is-open');toggle.setAttribute('aria-expanded','false');toggle.setAttribute('aria-label','Ouvrir le menu');const i=toggle.querySelector('i');if(i){i.classList.remove('fa-xmark');i.classList.add('fa-bars');}};toggle.addEventListener('click',()=>{const open=!nav.classList.contains('is-open');if(open){nav.classList.add('is-open');toggle.setAttribute('aria-expanded','true');toggle.setAttribute('aria-label','Fermer le menu');const i=toggle.querySelector('i');if(i){i.classList.remove('fa-bars');i.classList.add('fa-xmark');}}else close();});nav.querySelectorAll('a').forEach(a=>a.addEventListener('click',close));document.addEventListener('keydown',e=>{if(e.key==='Escape')close();});document.addEventListener('click',e=>{if(!nav.contains(e.target)&&!toggle.contains(e.target))close();});window.matchMedia('(min-width: 1001px)').addEventListener('change',close);})();
