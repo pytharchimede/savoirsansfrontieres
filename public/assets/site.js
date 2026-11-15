@@ -1,0 +1,1 @@
+document.querySelectorAll('[data-profile]').forEach(link=>link.addEventListener('click',()=>{const select=document.querySelector('#profile');if(select)select.value=link.dataset.profile;}));

@@ -1,0 +1,1 @@
+{"name":"savoirsansfrontieres/mvp","description":"Préinscriptions Savoir Sans Frontières","require":{"php":"^8.1","ext-pdo":"*","ext-pdo_mysql":"*"}}
