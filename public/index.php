@@ -14,6 +14,12 @@ require dirname(__DIR__).'/src/RegistrationService.php';
 require dirname(__DIR__).'/src/RegistrationController.php';
 $path=parse_url($_SERVER['REQUEST_URI']??'/',PHP_URL_PATH);
 $method=$_SERVER['REQUEST_METHOD']??'GET';
+if ($path==='/admin' || str_starts_with((string)$path,'/admin/')) {
+ require dirname(__DIR__).'/src/AdminAuth.php';
+ require dirname(__DIR__).'/src/AdminExport.php';
+ require dirname(__DIR__).'/src/AdminController.php';
+ AdminController::route((string)$path,$method);
+}
 if ($path==='/health' && $method==='GET') { header('Content-Type: application/json; charset=utf-8'); echo json_encode(['status'=>'ok']); exit; }
 if ($path==='/inscription' && $method==='POST') (new RegistrationController())->submit();
 if ($path==='/merci' && $method==='GET') { require dirname(__DIR__).'/views/thanks.php'; exit; }
